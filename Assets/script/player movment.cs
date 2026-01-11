@@ -1,7 +1,5 @@
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
 using UnityEngine.InputSystem;
-#endif
 
 public class PlayerMovement : MonoBehaviour
 {
@@ -25,26 +23,21 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
-#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
-        // New Input System: combine keyboard (A/D) and gamepad left stick
-        float kb = 0f;
-        if (Keyboard.current != null)
-            kb = (Keyboard.current.dKey.isPressed ? 1f : 0f) - (Keyboard.current.aKey.isPressed ? 1f : 0f);
-
-        float gp = Gamepad.current != null ? Gamepad.current.leftStick.x.ReadValue() : 0f;
-
-        horizontalInput = Mathf.Clamp(kb + gp, -1f, 1f);
-
-        bool jumpPressed = false;
-        if (Keyboard.current != null)
-            jumpPressed |= Keyboard.current.spaceKey.isPressed;
+        // Read horizontal input from Gamepad left stick or keyboard (A/D or arrow keys)
+        float gamepadX = 0f;
         if (Gamepad.current != null)
-            jumpPressed |= Gamepad.current.buttonSouth.isPressed;
-#else
-        // Legacy Input Manager
-        horizontalInput = Input.GetAxis("Horizontal");
-        bool jumpPressed = Input.GetKey(KeyCode.Space);
-#endif
+            gamepadX = Gamepad.current.leftStick.ReadValue().x;
+
+        float keyboardX = 0f;
+        if (Keyboard.current != null)
+        {
+            if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed)
+                keyboardX -= 1f;
+            if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed)
+                keyboardX += 1f;
+        }
+
+        horizontalInput = Mathf.Clamp(gamepadX + keyboardX, -1f, 1f);
 
         //Flip player when moving left-right
         if (horizontalInput > 0.01f)
@@ -68,6 +61,12 @@ public class PlayerMovement : MonoBehaviour
             }
             else
                 body.gravityScale = 7;
+
+            bool jumpPressed = false;
+            if (Keyboard.current != null && Keyboard.current.spaceKey.isPressed)
+                jumpPressed = true;
+            if (Gamepad.current != null && Gamepad.current.buttonSouth.isPressed)
+                jumpPressed = true;
 
             if (jumpPressed)
                 Jump();
@@ -97,6 +96,7 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+
     private bool isGrounded()
     {
         RaycastHit2D raycastHit = Physics2D.BoxCast(boxCollider.bounds.center, boxCollider.bounds.size, 0, Vector2.down, 0.1f, groundLayer);
@@ -109,6 +109,13 @@ public class PlayerMovement : MonoBehaviour
     }
     public bool canAttack()
     {
-        return horizontalInput == 0 && isGrounded() && !onWall();
+        // Allow attacking while in the air by removing the grounded requirement
+        return horizontalInput == 0 && !onWall();
+    }
+
+    // Expose current physics velocity so projectiles can inherit player motion
+    public UnityEngine.Vector2 GetVelocity()
+    {
+        return body != null ? body.linearVelocity : UnityEngine.Vector2.zero;
     }
 }

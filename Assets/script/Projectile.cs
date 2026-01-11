@@ -28,8 +28,28 @@ public class Projectile : MonoBehaviour
     {
         hit = true;
         boxCollider.enabled = false;
-        anim.SetTrigger("explode");
-    }
+        if (anim != null)
+        {
+            if (HasAnimatorParameter(anim, "explode"))
+            {
+                anim.SetTrigger("explode");
+            }
+            else if (anim.HasState(0, Animator.StringToHash("Explode")))
+            {
+                anim.Play("Explode");
+            }
+            else
+            {
+                // No explode trigger or state: immediately deactivate so projectile doesn't get stuck
+                Deactivate();
+            }
+        }
+        else
+        {
+            // No animator attached: just deactivate the projectile
+            Deactivate();
+        }
+  }
     public void SetDirection(float _direction)
     {
         lifetime = 0;
@@ -47,5 +67,16 @@ public class Projectile : MonoBehaviour
     private void Deactivate()
     {
         gameObject.SetActive(false);
+    }
+
+    private bool HasAnimatorParameter(Animator animator, string paramName)
+    {
+        foreach (var param in animator.parameters)
+        {
+            // Ensure the parameter exists and is a Trigger
+            if (param.name == paramName && param.type == AnimatorControllerParameterType.Trigger)
+                return true;
+        }
+        return false;
     }
 }
